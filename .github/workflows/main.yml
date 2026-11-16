@@ -25,6 +25,17 @@ jobs:
       - name: Install Android build tools
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;21.4.7075529" "cmake;3.22.1"
 
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          VERSION_NAME=$(sed -nE "s/^[[:space:]]*versionName[[:space:]]+['\"]([^'\"]+)['\"].*/\1/p" app/build.gradle | head -n 1)
+          if [ -z "$VERSION_NAME" ]; then
+            echo "Could not read versionName from app/build.gradle"
+            exit 1
+          fi
+          echo "value=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
       - name: Build release APK
         run: bash ./gradlew --no-daemon :app:assembleRelease
 
@@ -35,8 +46,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
-          name: DailyTask ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', steps.build_date.outputs.value) }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || steps.app_version.outputs.value }}
+          name: ${{ github.ref_type == 'tag' && format('DailyTask {0}', github.ref_name) || format('DailyTask build-{0}', steps.build_date.outputs.value) }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: app/build/outputs/apk/release/*.apk
